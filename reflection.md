@@ -7,10 +7,47 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+- My initial UML design for PawPal+ includes five main classes: Owner, Pet, CareTask, CarePlan, and PlanGenerator.
+
+The Owner class represents the pet owner. It stores the owner’s name, available time, and preferences.
+
+The Pet class stores basic information about the pet, such as name, species, and age.
+
+The CareTask class represents one care activity, such as feeding, walking, medication, grooming, or enrichment. It stores the task title, category, priority, duration, preferred time, and completion status.
+
+The CarePlan class represents the daily plan. It stores the date, total minutes, scheduled tasks, and an explanation of why the tasks were chosen.
+
+The PlanGenerator class handles the planning logic. It sorts tasks by priority, checks which tasks fit into the owner’s available time, and builds the final care plan.
+
+Main.py Sample output - 
+
+=============================================
+Today's Schedule for Maya
+(Time available: 60 minutes)
+=============================================
+
+Pets:
+  - Luna (cat, age 2) - 2 task(s)
+  - Buddy (dog, age 4) - 3 task(s)
+
+Planned tasks:
+  1. Feed breakfast at 07:30 (daily, 10 min, priority 5) - not done
+  2. Morning walk at 08:00 (daily, 30 min, priority 5) - not done
+  3. Clean litter box at 12:00 (daily, 15 min, priority 3) - not done
+
+Total time planned: 55 of 60 minutes
+=============================================
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes, my design changed during implementation. I simplified the design from five classes to four main classes: Task, Pet, Owner, and Scheduler.
+
+I changed CareTask to Task to make the class name shorter and simpler. I also combined the CarePlan and PlanGenerator idea into the Scheduler class. The Scheduler now acts as the brain of the system because it collects tasks from the owner’s pets, sorts them by priority, and creates the daily plan.
+
+This made the code easier to understand and matched the implementation in pawpal_system.py.
 
 ---
 

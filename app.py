@@ -1,5 +1,7 @@
 import streamlit as st
 
+from pawpal_system import Owner, Pet, Task, Scheduler
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -38,51 +40,102 @@ At minimum, your system should:
 
 st.divider()
 
-st.subheader("Quick Demo Inputs (UI only)")
+st.subheader("Owner")
 owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
 
-st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
-
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-
-if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
-
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
-else:
-    st.info("No tasks yet. Add one above.")
+# Create the Owner once and keep it in session_state so it survives reruns.
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(name=owner_name)
+owner = st.session_state.owner
+owner.name = owner_name  # keep the stored owner's name in sync with the input
 
 st.divider()
 
+# --- Add a Pet ----------------------------------------------------------
+st.subheader("Add a Pet")
+pet_name = st.text_input("Pet name", value="Mochi")
+species = st.selectbox("Species", ["dog", "cat", "other"])
+age = st.number_input("Age (years)", min_value=0, max_value=50, value=1)
+
+if st.button("Add pet"):
+    # Owner.add_pet() is the method that stores the new Pet on the owner.
+    owner.add_pet(Pet(name=pet_name, species=species, age=int(age)))
+    st.success(f"Added {pet_name} to {owner.name}.")
+
+# Show the pets the owner currently has (read back from the Owner object).
+if owner.get_pets():
+    st.write("Current pets:")
+    for pet in owner.get_pets():
+        st.write("- " + pet.get_info())
+else:
+    st.info("No pets yet. Add one above.")
+
+st.divider()
+
+# --- Add a Task to a Pet ------------------------------------------------
+st.subheader("Add a Task")
+
+if not owner.get_pets():
+    st.info("Add a pet first, then you can give it tasks.")
+else:
+    pet_names = [pet.name for pet in owner.get_pets()]
+    chosen_pet_name = st.selectbox("Which pet is this task for?", pet_names)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        task_title = st.text_input("Task title", value="Morning walk")
+    with col2:
+        duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+    with col3:
+        priority_label = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+
+    task_time = st.text_input("Time", value="08:00")
+    frequency = st.selectbox("Frequency", ["daily", "weekly"])
+
+    # Task stores priority as a number (higher = more important),
+    # so translate the words into numbers.
+    priority_numbers = {"low": 1, "medium": 3, "high": 5}
+
+    if st.button("Add task"):
+        # Find the Pet object the user picked...
+        chosen_pet = next(p for p in owner.get_pets() if p.name == chosen_pet_name)
+        # ...then Pet.add_task() attaches the new Task to it.
+        chosen_pet.add_task(
+            Task(
+                description=task_title,
+                time=task_time,
+                frequency=frequency,
+                priority=priority_numbers[priority_label],
+                duration_minutes=int(duration),
+            )
+        )
+        st.success(f"Added '{task_title}' to {chosen_pet_name}.")
+
+    # Show every task across all of the owner's pets.
+    all_tasks = owner.get_all_tasks()
+    if all_tasks:
+        st.write("Current tasks:")
+        for task in all_tasks:
+            st.write("- " + task.get_info())
+    else:
+        st.info("No tasks yet. Add one above.")
+
+st.divider()
+
+# --- Build the daily schedule -------------------------------------------
 st.subheader("Build Schedule")
-st.caption("This button should call your scheduling logic once you implement it.")
+available_minutes = st.number_input(
+    "Minutes available today", min_value=1, max_value=1440, value=60
+)
 
 if st.button("Generate schedule"):
-    st.warning(
-        "Not implemented yet. Next step: create your scheduling logic (classes/functions) and call it here."
-    )
-    st.markdown(
-        """
-Suggested approach:
-1. Design your UML (draft).
-2. Create class stubs (no logic).
-3. Implement scheduling behavior.
-4. Connect your scheduler here and display results.
-"""
-    )
+    # Scheduler.generate_daily_plan() reads the owner's pets/tasks and
+    # returns the tasks to do today, most important first.
+    scheduler = Scheduler()
+    plan = scheduler.generate_daily_plan(owner, available_minutes=int(available_minutes))
+    if plan:
+        st.write(f"Daily plan for {owner.name} ({int(available_minutes)} minutes):")
+        for task in plan:
+            st.write("- " + task.get_info())
+    else:
+        st.warning("No tasks fit the plan. Add tasks or increase the available minutes.")
