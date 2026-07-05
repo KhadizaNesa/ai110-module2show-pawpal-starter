@@ -53,21 +53,58 @@ Paste a sample of your app's CLI or Streamlit output here so a reader can see wh
 #   09:00 — Feeding (10 min) [priority: high]
 #   ...
 ```
+Main.py Sample output - 
+
+=============================================
+Today's Schedule for Maya
+(Time available: 60 minutes)
+=============================================
+
+Pets:
+  - Luna (cat, age 2) - 2 task(s)
+  - Buddy (dog, age 4) - 3 task(s)
+
+Planned tasks:
+  1. Feed breakfast at 07:30 (daily, 10 min, priority 5) - not done
+  2. Morning walk at 08:00 (daily, 30 min, priority 5) - not done
+  3. Clean litter box at 12:00 (daily, 15 min, priority 3) - not done
+
+Total time planned: 55 of 60 minutes
+=============================================
 
 ## 🧪 Testing PawPal+
 
-```bash
-# Run the full test suite:
-pytest
+Run the full test suite from the project root:
 
-# Run with coverage:
-pytest --cov
+```bash
+python -m pytest
 ```
+
+The automated tests confirm that PawPal+'s core scheduling logic works as
+expected, so you can change the code and quickly see if anything breaks. They
+cover both everyday use and trickier edge cases, including:
+
+- **Task completion** — a task starts not-done and becomes done.
+- **Adding tasks to a pet** — a pet's task list grows when a task is added.
+- **Sorting tasks by priority and time** — most important first, and earliest first.
+- **Daily plan generation** — the plan stays within the available time limit.
+- **Filtering tasks** — by completion status and by pet.
+- **Recurring tasks** — daily and weekly tasks create the correct next occurrence.
+- **Conflict detection** — tasks with the same date and time are flagged.
+- **Edge cases** — such as owners with no pets or pets with no tasks.
 
 Sample test output:
 
 ```
-# Paste your pytest output here
+================================ test session starts ================================
+platform win32 -- Python 3.13.4, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\dibs1\Desktop\CodePath_summer26\ai110-module2show-pawpal-starter
+plugins: anyio-4.14.1
+collected 22 items
+
+tests\test_pawpal.py ......................                                    [100%]
+
+================================ 22 passed in 0.06s =================================
 ```
 
 ## 📐 Smarter Scheduling
@@ -80,6 +117,15 @@ Sample test output:
 | Filtering | | e.g., skip tasks if time runs out |
 | Conflict handling | | e.g., overlapping time slots |
 | Recurring tasks | | e.g., daily vs. weekly |
+
+## 📐 Smarter Scheduling
+
+| Feature | Method(s) | Notes |
+|---------|-----------|-------|
+| Task sorting | `Scheduler.sort_by_time()` | Sorts tasks by scheduled time in `"HH:MM"` format, earliest first. |
+| Filtering | `Scheduler.filter_by_completion()`, `Scheduler.filter_by_pet_name()` | Filters tasks by completion status or by pet name. |
+| Conflict handling | `Scheduler.find_conflicts()` | Detects tasks that have the same due date and same scheduled time. |
+| Recurring tasks | `Task.create_next_occurrence()`, `Scheduler.mark_task_complete()` | Creates the next daily or weekly task after a recurring task is marked complete. |
 
 ## 📸 Demo Walkthrough
 
