@@ -1,8 +1,13 @@
 import streamlit as st
 
-from pawpal_system import Owner, Pet, Task, Scheduler
+from pawpal_system import Owner, Pet, Task, Scheduler, priority_from_level
+from formatting import task_emoji, status_icon
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
+
+# One Scheduler used everywhere below. It holds no state of its own, so a
+# single shared instance is fine for sorting, filtering, and conflict checks.
+scheduler = Scheduler()
 
 st.title("🐾 PawPal+")
 
@@ -41,13 +46,22 @@ At minimum, your system should:
 st.divider()
 
 st.subheader("Owner")
-owner_name = st.text_input("Owner name", value="Jordan")
 
-# Create the Owner once and keep it in session_state so it survives reruns.
+# Load any saved owner (with its pets and tasks) from data.json the first time
+# the app runs. If data.json does not exist yet, load_from_json() returns a
+# fresh, empty Owner. We keep the result in session_state so it survives reruns.
 if "owner" not in st.session_state:
-    st.session_state.owner = Owner(name=owner_name)
+    st.session_state.owner = Owner.load_from_json()
 owner = st.session_state.owner
+
+# Pre-fill the name box with whatever was loaded (falls back to "Jordan").
+owner_name = st.text_input("Owner name", value=owner.name or "Jordan")
 owner.name = owner_name  # keep the stored owner's name in sync with the input
+
+# Let the user save the current owner, pets, and tasks back to data.json.
+if st.button("💾 Save data"):
+    owner.save_to_json()
+    st.success("Saved pets and tasks to data.json.")
 
 st.divider()
 
@@ -87,36 +101,81 @@ else:
     with col2:
         duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
     with col3:
-        priority_label = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+        priority_label = st.selectbox("Priority", ["Low", "Medium", "High"], index=2)
 
     task_time = st.text_input("Time", value="08:00")
     frequency = st.selectbox("Frequency", ["daily", "weekly"])
 
-    # Task stores priority as a number (higher = more important),
-    # so translate the words into numbers.
-    priority_numbers = {"low": 1, "medium": 3, "high": 5}
-
     if st.button("Add task"):
         # Find the Pet object the user picked...
         chosen_pet = next(p for p in owner.get_pets() if p.name == chosen_pet_name)
-        # ...then Pet.add_task() attaches the new Task to it.
+        # ...then Pet.add_task() attaches the new Task to it. The Task stores
+        # priority as a number (higher = more important), so translate the
+        # chosen word ("High") into its number with priority_from_level().
         chosen_pet.add_task(
             Task(
                 description=task_title,
                 time=task_time,
                 frequency=frequency,
-                priority=priority_numbers[priority_label],
+                priority=priority_from_level(priority_label),
                 duration_minutes=int(duration),
             )
         )
         st.success(f"Added '{task_title}' to {chosen_pet_name}.")
 
-    # Show every task across all of the owner's pets.
+    # Show tasks across the owner's pets, in chronological order.
     all_tasks = owner.get_all_tasks()
     if all_tasks:
         st.write("Current tasks:")
-        for task in all_tasks:
-            st.write("- " + task.get_info())
+
+        # --- Filter controls ---------------------------------------------
+        fcol1, fcol2 = st.columns(2)
+        with fcol1:
+            pet_filter = st.selectbox("Filter by pet", ["All pets"] + pet_names)
+        with fcol2:
+            status_filter = st.selectbox(
+                "Filter by status", ["All", "Not done", "Done"]
+            )
+
+        # Narrow to one pet's tasks if a specific pet is chosen.
+        if pet_filter == "All pets":
+            tasks_to_show = all_tasks
+        else:
+            tasks_to_show = scheduler.filter_by_pet_name(owner, pet_filter)
+
+        # Narrow by completion status if one is chosen.
+        if status_filter == "Done":
+            tasks_to_show = scheduler.filter_by_completion(tasks_to_show, True)
+        elif status_filter == "Not done":
+            tasks_to_show = scheduler.filter_by_completion(tasks_to_show, False)
+
+        # Put whatever is left in chronological (earliest-time-first) order.
+        tasks_to_show = scheduler.sort_by_time(tasks_to_show)
+
+        # Warn about any tasks that clash on the same day and time.
+        conflicts = scheduler.find_conflicts(owner)
+        for conflict in conflicts:
+            st.warning(conflict)
+
+        if tasks_to_show:
+            st.dataframe(
+                [
+                    {
+                        "": f"{status_icon(task.completed)} {task_emoji(task.description)}",
+                        "Time": task.time,
+                        "Task": task.description,
+                        "Frequency": task.frequency,
+                        "Priority": task.priority_label(),
+                        "Duration (min)": task.duration_minutes,
+                        "Status": "✅ done" if task.completed else "⬜ not done",
+                    }
+                    for task in tasks_to_show
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No tasks match the current filters.")
     else:
         st.info("No tasks yet. Add one above.")
 
@@ -131,7 +190,6 @@ available_minutes = st.number_input(
 if st.button("Generate schedule"):
     # Scheduler.generate_daily_plan() reads the owner's pets/tasks and
     # returns the tasks to do today, most important first.
-    scheduler = Scheduler()
     plan = scheduler.generate_daily_plan(owner, available_minutes=int(available_minutes))
     if plan:
         st.write(f"Daily plan for {owner.name} ({int(available_minutes)} minutes):")
